@@ -1,0 +1,256 @@
+---
+title: "Untitled"
+author: "srija"
+date: "2024-05-02"
+output: html_document
+---
+```{r}
+# Importing the libraries
+
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(car)
+
+df <- read.csv("C:/Users/srija/Downloads/insurance.csv")
+head(df)
+dim(df) # To check the dimensions of the dataframe
+str(df) # To see the structure of the dataframe
+summary(df) # With the summary() we can see the detailed summary which 
+# includes statistical measures like minimum,maximum, median,mean,
+# and quartiles. It also help us understand the distribution of categorical data 
+colSums(is.na(df))# is used to check the number of NA values per column
+unique_values <- lapply(df[c('sex','smoker','region')], unique)
+print(unique_values)
+# we have calculated the number of unique values for each column to get a better 
+# understanding of our dataframe
+
+########## Exploratory Data Analysis & Hypothesis Testing######
+
+```
+
+
+```{r}
+########## Exploratory Data Analysis & Hypothesis Testing######
+
+# Univariate analysis
+
+ggplot(df, aes(age, charges)) +
+  geom_jitter(color = "blue", alpha = 0.5) +
+  theme_light() + 
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 20), 
+        plot.title = element_text(size = 25, hjust = 0.5)) +
+  labs(title = 'Scatterplot for charges and age')
+
+# We can infer that age is not the main determinant for determining the insurance charges
+# As individuals with chronic health conditions may incur higher medical costs 
+# regardless of their age and complexity of how insurance premiums
+# are calculated goes beyond just age.
+
+
+ggplot(df, aes(bmi, charges)) +
+  geom_jitter(color = "orange", alpha = 0.5) +
+  theme_light() + 
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 20), 
+        plot.title = element_text(size = 25, hjust = 0.5)) +
+  labs(title = 'Scatterplot for charges and BMI')
+
+# We can divide above chart into two groups i.e,
+
+# the charges below 18000 : charge doesn't increase with the bmi
+
+# and charges above 18000 : there is positive correlation between charge and bmi
+
+# So BMI is not the main factor.
+
+boxplot(charges ~ sex, data = df,
+        xlab = "Sex", ylab = "charges",
+        main = "Charges Boxplot by Gender",
+        col = c("blue", "red"))
+
+boxplot(charges ~ smoker, data = df,
+        xlab = "Smoker", ylab = "charges",
+        main = "Charges Boxplot by Smoke",
+        col = c("blue", "red"))
+
+# Insurance for people who smoke is more expensive
+
+print("Number of data by Smoke")
+table(df$smoker)
+
+boxplot(charges ~ region, data = df,
+        xlab = "Region", ylab = "charges",
+        main = "Charges Boxplot by Region",
+        col = c("blue", "red", "darkgreen", 'orange'))
+
+table(df$region)
+
+boxplot(charges ~ children, data = df,
+        xlab = "Children", ylab = "charges",
+        main = "Charges Boxplot by Children",
+        col = c("blue", "red", "darkgreen", 'orange',"purple", 'brown'))
+
+table(df$children)
+
+# Till now, we can see that smoker is the main factor which is used 
+# to determine the price of insurance.
+
+
+ggplot(df, aes(x=age, y=charges,color = smoker)) +
+  geom_point() +
+  geom_smooth(method="lm", col="blue") +
+  labs(title="Age vs Medical Charges", x="Age", y="Charges")
+
+
+# BMI vs Charges, colored by smoker status
+ggplot(df, aes(x=bmi, y=charges, color=smoker)) +
+  geom_point() +
+  geom_smooth(method="lm", col="red") +
+  labs(title="BMI vs Medical Charges by Smoker Status", x="BMI", y="Charges")
+
+# From the visualization we can prove that smoking is the 
+# key factor to make the increase of insurance. 
+
+# One thing to consider that charge difference between smoke and non smoke 
+# over 30 is higher than that for bmi less than 30
+
+df <- df %>%
+  mutate(obesity = case_when(
+    bmi > 30 ~ 1,
+    bmi <= 30 ~ 0
+  ))
+
+
+ggplot(df, aes(x = smoker, y = charges, fill = sex)) +
+  geom_boxplot() +
+  labs(x = "Smoker", y = "Insurance Charge", fill = "Sex") +
+  ggtitle("Influence of Gender on Insurance Charges based on Smoking Status")
+
+pivot_table <- df %>%
+  group_by(sex, smoker) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = smoker, values_from = count)
+
+print(pivot_table)
+```
+
+```{r}
+male_smoke <- df %>%
+  filter(sex == "male", smoker == "yes")
+
+female_smoke <- df %>%
+  filter(sex == "female", smoker == "yes")
+
+male_nonsmoke <- df %>%
+  filter(sex == "male", smoker == "no")
+
+female_nonsmoke <- df %>%
+  filter(sex == "female", smoker == "no")
+
+# Perform Shapiro-Wilk test for normality
+cat("Shapiro-Wilk Normality Test for Male Smokers:\n")
+print(shapiro.test(male_smoke$charges))
+
+cat("Shapiro-Wilk Normality Test for Female Smokers:\n")
+print(shapiro.test(female_smoke$charges))
+
+cat("Shapiro-Wilk Normality Test for Male Non-Smokers:\n")
+print(shapiro.test(male_nonsmoke$charges))
+
+cat("Shapiro-Wilk Normality Test for Female Non-Smokers:\n")
+print(shapiro.test(female_nonsmoke$charges))
+
+result_smokers <- t.test(male_smoke$charges, female_smoke$charges, 
+                         alternative = "two.sided", 
+                         conf.level = 0.95)
+
+result_nonsmokers <- t.test(male_nonsmoke$charges, female_nonsmoke$charges, 
+                            alternative = "two.sided", 
+                            conf.level = 0.95)
+
+# Print the results for smokers
+cat("\nT-test results for smokers:\n")
+print(result_smokers)
+
+# Print the results for non-smokers
+cat("\nT-test results for non-smokers:\n")
+print(result_nonsmokers)
+
+### The difference between two genders are not significant for smokers and nonsmokers
+
+ggplot(df, aes(x = smoker, y = charges, fill = region)) +
+  geom_boxplot() +
+  labs(x = "Smoker", y = "Insurance Charge", fill = "Region") +
+  ggtitle("Influence of GRegion on Insurance Charges based on Smoking Status")
+
+pivot_table <- df %>%
+  group_by(region, smoker) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = smoker, values_from = count)
+
+print(pivot_table)
+
+```
+```{r}
+male_smoke <- df %>%
+  filter(sex == "male", smoker == "yes")
+
+female_smoke <- df %>%
+  filter(sex == "female", smoker == "yes")
+
+male_nonsmoke <- df %>%
+  filter(sex == "male", smoker == "no")
+
+female_nonsmoke <- df %>%
+  filter(sex == "female", smoker == "no")
+
+# Perform Shapiro-Wilk test for normality
+cat("Shapiro-Wilk Normality Test for Male Smokers:\n")
+print(shapiro.test(male_smoke$charges))
+
+cat("Shapiro-Wilk Normality Test for Female Smokers:\n")
+print(shapiro.test(female_smoke$charges))
+
+cat("Shapiro-Wilk Normality Test for Male Non-Smokers:\n")
+print(shapiro.test(male_nonsmoke$charges))
+
+cat("Shapiro-Wilk Normality Test for Female Non-Smokers:\n")
+print(shapiro.test(female_nonsmoke$charges))
+
+result_smokers <- t.test(male_smoke$charges, female_smoke$charges, 
+                         alternative = "two.sided", 
+                         conf.level = 0.95)
+
+result_nonsmokers <- t.test(male_nonsmoke$charges, female_nonsmoke$charges, 
+                            alternative = "two.sided", 
+                            conf.level = 0.95)
+
+# Print the results for smokers
+cat("\nT-test results for smokers:\n")
+print(result_smokers)
+
+# Print the results for non-smokers
+cat("\nT-test results for non-smokers:\n")
+print(result_nonsmokers)
+```
+```{r}
+# Filter data for non-smokers and smokers
+nonsmoke <- df %>% filter(smoker == "no")
+smoke <- df %>% filter(smoker == "yes")
+
+# Check for normality of residuals using Shapiro-Wilk test
+shapiro_test_nonsmoke <- shapiro.test(residuals(lm(charges ~ region, data = nonsmoke)))
+cat("Shapiro-Wilk Test for Normality of Residuals (Non-Smokers):\n")
+print(shapiro_test_nonsmoke)
+
+shapiro_test_smoke <- shapiro.test(residuals(lm(charges ~ region, data = smoke)))
+cat("Shapiro-Wilk Test for Normality of Residuals (Smokers):\n")
+print(shapiro_test_smoke)
+
+```
+```{r}
+
+```
+
